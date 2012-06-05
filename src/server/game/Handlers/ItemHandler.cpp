@@ -689,11 +689,11 @@ void WorldSession::HandleBuyItemOpcode(WorldPacket & recv_data)
 {
     sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Received CMSG_BUY_ITEM");
     uint64 vendorguid, unk2; // unk2 can be 0?
-    uint32 item, slot, count;
-    uint8 unk1; // if this is == 2 then the count might be multiplied by 100
+    uint32 item, slot, itemcount;
+    uint8 count_to_buy; // if this is == 2 then the count might be multiplied by 100 number to buy
     int8 unk3; // only known value = -1, according to the client it can take more values
 
-    recv_data >> vendorguid >> unk1 >> item >> slot >> count >> unk2 >> unk3;
+    recv_data >> vendorguid >> count_to_buy >> item >> slot >> itemcount >> unk2 >> unk3;
 
     // client expects count starting at 1, and we send vendorslot+1 to client already
     if (slot > 0)
@@ -701,7 +701,7 @@ void WorldSession::HandleBuyItemOpcode(WorldPacket & recv_data)
     else
         return; // cheating
 
-    GetPlayer()->BuyItemFromVendorSlot(vendorguid, slot, item, count, NULL_BAG, NULL_SLOT);
+    GetPlayer()->BuyItemFromVendorSlot(vendorguid, slot, item, itemcount, NULL_BAG, NULL_SLOT);
 }
 
 void WorldSession::HandleListInventoryOpcode(WorldPacket & recv_data)
@@ -717,6 +717,20 @@ void WorldSession::HandleListInventoryOpcode(WorldPacket & recv_data)
 
     SendListInventory(guid);
 }
+
+struct ArrayItem_ListInvetori
+{
+    uint32 itemSlot;
+    uint32 itemId;
+	int32 itemUnk0;
+	uint32 itemDiplayId;
+	int32 itemMaxCount;
+	int32 itemBuyPrice;
+	int32 itemMaxDurability;
+	int32 itemUnk1;
+	int32 itemBuyCount;
+	uint32 itemExtendedCont;
+};
 
 void WorldSession::SendListInventory(uint64 vendorGuid)
 {
@@ -743,18 +757,16 @@ void WorldSession::SendListInventory(uint64 vendorGuid)
     VendorItemData const* items = vendor->GetVendorItems();
     if (!items)
     {
-        WorldPacket data(SMSG_LIST_INVENTORY, 8 + 1 + 1);
-        data.WriteByteMask(bytes[5]);
-        data.WriteByteMask(bytes[6]);
+       /* WorldPacket data(SMSG_LIST_INVENTORY, 8 + 1 + 1);
         data.WriteByteMask(bytes[1]);
-        data.WriteByteMask(bytes[2]);
-        data.WriteByteMask(bytes[3]);
         data.WriteByteMask(bytes[0]);
+        data.WriteByteMask(bytes[3]);
+        data.WriteByteMask(bytes[6]);
+        data.WriteByteMask(bytes[5]);
+        data.WriteByteMask(bytes[2]);
         data.WriteByteMask(bytes[7]);
-        data.WriteByteMask(bytes[4]);
 
-        data.WriteByteSeq(bytes[2]);
-        data.WriteByteSeq(bytes[3]);
+	    data.WriteByteMask(bytes[4]);
 
         data << uint8(0);                                   // count == 0, next will be error code
         data << uint8(0xA0);                                // Only seen 0xA0 (160) so far ( should we send 0 here?)
@@ -762,40 +774,24 @@ void WorldSession::SendListInventory(uint64 vendorGuid)
         data.WriteByteSeq(bytes[4]);
         data.WriteByteSeq(bytes[7]);
         data.WriteByteSeq(bytes[6]);
+		data.WriteByteSeq(bytes[2]);
+        data.WriteByteSeq(bytes[3]);
         SendPacket(&data);
-        return;
+        return;*/
     }
 
     uint8 itemCount = items->GetItemCount();
     uint8 count = 0;
 
-    WorldPacket data(SMSG_LIST_INVENTORY, 8 + 1 + itemCount * 8 * 4);
+	//Csinalok egy listataz itemekbol amit maj a vegen olvasok be
+	std::vector<ArrayItem_ListInvetori> ArrayItemListInventory;
+	ArrayItemListInventory.resize(itemCount ? itemCount : 0);
 
-    data.WriteByteMask(bytes[5]);
-    data.WriteByteMask(bytes[6]);
-    data.WriteByteMask(bytes[1]);
-    data.WriteByteMask(bytes[2]);
-    data.WriteByteMask(bytes[3]);
-    data.WriteByteMask(bytes[0]);
-    data.WriteByteMask(bytes[7]);
-    data.WriteByteMask(bytes[4]);
+    WorldPacket data(SMSG_LIST_INVENTORY); // 8 + 1 + itemCount * 10 * 4
 
-    data.WriteByteSeq(bytes[2]);
-    data.WriteByteSeq(bytes[3]);
+  
 
-    size_t countPos = data.wpos();
-    data << uint32(count);
-
-    data.WriteByteSeq(bytes[5]);
-    data.WriteByteSeq(bytes[0]);
-    data.WriteByteSeq(bytes[1]);
-
-    data << uint8(0xA0); // Only seen 0xA0 (160) so far
-
-    data.WriteByteSeq(bytes[4]);
-    data.WriteByteSeq(bytes[7]);
-    data.WriteByteSeq(bytes[6]);
-
+	ArrayItem_ListInvetori ItemListInventory = ArrayItem_ListInvetori();
 
     float discountMod = _player->GetReputationPriceDiscount(vendor);
 
@@ -817,21 +813,38 @@ void WorldSession::SendListInventory(uint64 vendorGuid)
                 if (!_player->isGameMaster() && !leftInStock)
                     continue;
 
-                ++count;
-
                 // reputation discount
                 int32 price = item->IsGoldRequired(itemTemplate) ? uint32(floor(itemTemplate->BuyPrice * discountMod)) : 0;
+				               
+				
+				ItemListInventory.itemSlot = slot+1;
+				ItemListInventory.itemId = item->item;
+				ItemListInventory.itemUnk0 = itemTemplate->Unk0;
+				ItemListInventory.itemDiplayId = itemTemplate->DisplayInfoID;
+				ItemListInventory.itemBuyCount = itemTemplate->BuyCount;
+				ItemListInventory.itemBuyPrice = price;
+				ItemListInventory.itemMaxDurability =itemTemplate->MaxDurability;
+				ItemListInventory.itemUnk1 = int32(0);
+				ItemListInventory.itemMaxCount = leftInStock;
+				ItemListInventory.itemExtendedCont=item->ExtendedCost;
 
-                data << uint32(itemTemplate->MaxDurability);
-                data << uint32(slot + 1);       // client expects counting to start at 1
-                data << uint32(item->item);
-                data << uint32(0);              // Always 0?
-                data << uint32(itemTemplate->DisplayInfoID);
-                data << int32(leftInStock);
-                data << uint32(itemTemplate->BuyCount);
-                data << uint32(item->ExtendedCost);
-                data << uint32(1);              // Always 1?
+				ArrayItemListInventory[count] = ItemListInventory;
+
+				++count;
+				
+				/*
+				data << uint32(slot + 1);       // client expects counting to start at 1
+				data << uint32(item->item);
+				data << uint32(0);              // Always 0?
+				data << uint32(itemTemplate->DisplayInfoID);
+				data << int32(leftInStock);
                 data << uint32(price);
+				data << uint32(itemTemplate->MaxDurability);          
+                data << uint32(0);              // Always 0?
+                data << uint32(itemTemplate->BuyCount);
+                data << uint32(item->ExtendedCost);*/
+               
+               
             }
         }
     }
@@ -842,7 +855,66 @@ void WorldSession::SendListInventory(uint64 vendorGuid)
         return;
     }
 
-    data.put<uint32>(countPos, count);
+	data.WriteByteMask(bytes[1]);
+    data.WriteByteMask(bytes[0]);
+	data.WriteBits(count,21);
+	
+	//data << uint8(count);
+
+    data.WriteByteMask(bytes[3]);
+    data.WriteByteMask(bytes[6]);
+    data.WriteByteMask(bytes[5]);
+    data.WriteByteMask(bytes[2]);
+    data.WriteByteMask(bytes[7]);
+
+	for (uint8 i = 0; i < count; ++i)
+	{
+		data.WriteBit(ArrayItemListInventory[i].itemUnk0 > 0 ? 0 : 1);
+		data.WriteBit(1);
+
+	}
+	data.WriteByteMask(bytes[4]);
+	
+	data.FlushBits();
+
+	for (uint8 i = 0; i < count; ++i)
+	
+	{
+		data << uint32(ArrayItemListInventory[i].itemSlot);
+		data << int32(ArrayItemListInventory[i].itemMaxDurability);
+		data << uint32(ArrayItemListInventory[i].itemId);
+		
+		if(ArrayItemListInventory[i].itemUnk0 > 0)
+			data << int32(ArrayItemListInventory[i].itemUnk0);
+		
+		
+		data << int32(ArrayItemListInventory[i].itemBuyCount);
+		data << int32(ArrayItemListInventory[i].itemBuyPrice);
+		data << uint32(ArrayItemListInventory[i].itemDiplayId);
+		
+		
+		if(ArrayItemListInventory[i].itemUnk1 > 0)
+			data << int32(ArrayItemListInventory[i].itemUnk1);
+		
+		data << int32(ArrayItemListInventory[i].itemMaxCount);
+		data << uint32(ArrayItemListInventory[i].itemExtendedCont);
+	}
+
+
+	data.WriteByteSeq(bytes[5]);
+    data.WriteByteSeq(bytes[4]);
+	
+    data.WriteByteSeq(bytes[1]);
+    data.WriteByteSeq(bytes[0]);
+    data.WriteByteSeq(bytes[6]);
+
+    data << uint8(0xF4); // Only seen 0xA0 (160) so far
+
+    data.WriteByteSeq(bytes[2]);
+    data.WriteByteSeq(bytes[3]);
+    data.WriteByteSeq(bytes[7]);
+
+   
     SendPacket(&data);
 }
 
