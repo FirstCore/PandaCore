@@ -74,6 +74,8 @@ MPQFile::MPQFile(const char* filename):
     buffer = 0;
 }
 
+	class OutOfMemory{};
+
 size_t MPQFile::read(void* dest, size_t bytes)
 {
     if (eof) return 0;
@@ -86,7 +88,16 @@ size_t MPQFile::read(void* dest, size_t bytes)
 
     memcpy(dest, &(buffer[pointer]), bytes);
 
-    pointer = rpos;
+	try
+	{
+		pointer = rpos;
+	
+	}
+	catch(OutOfMemory)
+	{
+		
+	}
+    
 
     return bytes;
 }

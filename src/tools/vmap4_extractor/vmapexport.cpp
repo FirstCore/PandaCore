@@ -76,7 +76,7 @@ bool preciseVectorData = false;
 
 //static const char * szWorkDirMaps = ".\\Maps";
 const char* szWorkDirWmo = "./Buildings";
-const char* szRawVMAPMagic = "VMAP004";
+const char* szRawVMAPMagic = "VMAP041";
 
 // Local testing functions
 
@@ -245,7 +245,6 @@ void ParsMapFiles()
                 {
                     if (ADTFile *ADT = WDT.GetMap(x,y))
                     {
-                        //sprintf(id_filename,"%02u %02u %03u",x,y,map_ids[i].id);//!!!!!!!!!
                         ADT->init(map_ids[i].id, x, y);
                         delete ADT;
                     }
@@ -261,20 +260,7 @@ void ParsMapFiles()
 void getGamePath()
 {
 #ifdef _WIN32
-    HKEY key;
-    DWORD t,s;
-    LONG l;
-    s = sizeof(input_path);
-    memset(input_path,0,s);
-    l = RegOpenKeyEx(HKEY_LOCAL_MACHINE,"SOFTWARE\\Blizzard Entertainment\\World of Warcraft",0,KEY_QUERY_VALUE,&key);
-    //l = RegOpenKeyEx(HKEY_LOCAL_MACHINE,"SOFTWARE\\Blizzard Entertainment\\Burning Crusade Closed Beta",0,KEY_QUERY_VALUE,&key);
-    l = RegQueryValueEx(key,"InstallPath",0,&t,(LPBYTE)input_path,&s);
-    RegCloseKey(key);
-    if (strlen(input_path) > 0)
-    {
-        if (input_path[strlen(input_path) - 1] != '\\') strcat(input_path, "\\");
-    }
-    strcat(input_path,"Data\\");
+    strcpy(input_path,"Data\\");
 #else
     strcpy(input_path,"Data/");
 #endif
@@ -350,19 +336,30 @@ bool fillArchiveNameVector(std::vector<std::string>& pArchiveNames)
 
     // open locale expansion and common files
     printf("Adding data files from locale directories.\n");
-    for (std::vector<std::string>::iterator i = locales.begin(); i != locales.end(); ++i)
+	for (std::vector<std::string>::iterator i = locales.begin(); i != locales.end(); ++i)
     {
         pArchiveNames.push_back(in_path + *i + "/locale-" + *i + ".MPQ");
-        pArchiveNames.push_back(in_path + *i + "/expansion-locale-" + *i + ".MPQ");
-        pArchiveNames.push_back(in_path + *i + "/lichking-locale-" + *i + ".MPQ");
+        pArchiveNames.push_back(in_path + *i + "/expansion1-locale-" + *i + ".MPQ");
+		pArchiveNames.push_back(in_path + *i + "/expansion2-locale-" + *i + ".MPQ");
+		pArchiveNames.push_back(in_path + *i + "/expansion3-locale-" + *i + ".MPQ");
+        pArchiveNames.push_back(in_path + *i + "/wow-update-" + *i + "-15211.MPQ");
+		pArchiveNames.push_back(in_path + *i + "/wow-update-" + *i + "-15354.MPQ");
+		pArchiveNames.push_back(in_path + *i + "/wow-update-" + *i + "-15595.MPQ");
     }
 
     // open expansion and common files
-    pArchiveNames.push_back(input_path + string("common.MPQ"));
-    pArchiveNames.push_back(input_path + string("common-2.MPQ"));
-    pArchiveNames.push_back(input_path + string("expansion.MPQ"));
-    pArchiveNames.push_back(input_path + string("lichking.MPQ"));
-
+	pArchiveNames.push_back(input_path + string("art.MPQ"));
+    pArchiveNames.push_back(input_path + string("world.MPQ"));
+    pArchiveNames.push_back(input_path + string("world2.MPQ"));
+    pArchiveNames.push_back(input_path + string("expansion1.MPQ"));
+	pArchiveNames.push_back(input_path + string("expansion2.MPQ"));
+	pArchiveNames.push_back(input_path + string("expansion3.MPQ"));
+	pArchiveNames.push_back(input_path + string("wow-update-base-15211.MPQ"));
+	pArchiveNames.push_back(input_path + string("wow-update-base-15354.MPQ"));
+	pArchiveNames.push_back(input_path + string("wow-update-base-15595.MPQ"));
+	
+  
+	/*
     // now, scan for the patch levels in the core dir
     printf("Scanning patch levels from data directory.\n");
     sprintf(path, "%spatch", input_path);
@@ -379,15 +376,15 @@ bool fillArchiveNameVector(std::vector<std::string>& pArchiveNames)
         if(scan_patches(path, pArchiveNames))
             foundOne = true;
     }
-
+	*/
     printf("\n");
 
-    if(!foundOne)
+   /*if(!foundOne)
     {
         printf("no locale found\n");
         return false;
     }
-
+	*/
     return true;
 }
 
